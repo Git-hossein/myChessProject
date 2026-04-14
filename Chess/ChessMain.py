@@ -40,6 +40,9 @@ def main():
                 case p.QUIT:
                     running = False
 
+                case p.KEYDOWN if e.key == p.K_LEFT:
+                    gs.undo_last_move()
+
                 case p.MOUSEBUTTONDOWN:
                     x, y = p.mouse.get_pos()
                     col = x // SQ_SIZE

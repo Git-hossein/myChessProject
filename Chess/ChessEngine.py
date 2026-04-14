@@ -29,6 +29,12 @@ class GameState:
         self.movelog.append(move)
         self.white_to_play = not self.white_to_play
 
+    def undo_last_move(self):
+        if len(self.movelog) != 0:
+            last_move: Move = self.movelog.pop()
+            self.board[last_move.end_sq_row, last_move.end_sq_col] = last_move.captured_piece
+            self.board[last_move.start_sq_row, last_move.start_sq_col] = last_move.moved_piece
+            self.white_to_play = not self.white_to_play
 
 
 class Move:
