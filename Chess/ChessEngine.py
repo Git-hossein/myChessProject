@@ -27,7 +27,7 @@ class GameState:
         self.board[move.start_sq_row, move.start_sq_col] = "--"
         self.board[move.end_sq_row, move.end_sq_col] = move.moved_piece
         self.movelog.append(move)
-        self.white_to_play = False
+        self.white_to_play = not self.white_to_play
 
 
 
