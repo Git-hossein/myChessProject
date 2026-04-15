@@ -4,6 +4,8 @@ responsible for determining the valid moves at the current state. it will also k
 """
 from __future__ import annotations
 import numpy as np
+from collections.abc import Callable
+from Chess.ChessMain import DIMENSION
 
 
 class GameState:
@@ -22,6 +24,9 @@ class GameState:
 
         self.white_to_play = True
         self.movelog = []
+        self.move_functions: dict[str, Callable] = {
+            "P": self.get_pawn_moves, "R": self.get_rook_moves, "N": self.get_knight_moves,
+            "B": self.get_bishop_moves, "Q": self.get_queen_moves, "K": self.get_king_moves}
 
     def make_move(self, move: Move):
         self.board[move.start_sq_row, move.start_sq_col] = "--"
@@ -35,6 +40,55 @@ class GameState:
             self.board[last_move.end_sq_row, last_move.end_sq_col] = last_move.captured_piece
             self.board[last_move.start_sq_row, last_move.start_sq_col] = last_move.moved_piece
             self.white_to_play = not self.white_to_play
+
+    def get_valid_moves(self):
+        return self.get_all_possible_moves()
+
+    def get_all_possible_moves(self):
+        possible_moves = []
+        turn = "w" if self.white_to_play else "b"
+        for r in range(DIMENSION):
+            for c in range(DIMENSION):
+                if self.board[r, c][0] != turn:
+                    continue
+                else:
+                    piece = self.board[r,c][1]
+                    possible_moves.extend(self.move_functions[piece](r, c))
+
+        return possible_moves
+
+    def get_pawn_moves(self, r, c):
+        """
+        get all the possible moves for a pawn located at row r and column c as a list {{{Move}}}s.
+        """
+        moves = []
+        forward = -1 if self.white_to_play else +1
+        starting_row = 6 if self.white_to_play else 1
+        opposing_color = "b" if self.white_to_play else "w"
+
+        if self.board[r + forward, c] == "--":                                               #move one square
+            moves.append(Move((r, c), (r + forward, c), self.board))
+            if r == starting_row and self.board[r + 2 * forward, c] == "--":                 #move two squares
+                moves.append(Move((r, c), (r + 2 * forward, c), self.board))
+
+        if c-1>=0 and self.board[r + forward, c-1][0] == opposing_color:                     #capture to the left
+            moves.append(Move((r,c), (r + forward, c-1), self.board))
+
+        if c+1 <= DIMENSION-1 and self.board[r + forward, c+1][0] == opposing_color:         #capture to the right
+            moves.append(Move((r, c), (r + forward, c + 1), self.board))
+
+        return moves
+
+    def get_rook_moves(self, r, c):
+        return []
+    def get_knight_moves(self, r, c):
+        return []
+    def get_bishop_moves(self, r, c):
+        return []
+    def get_queen_moves(self, r, c):
+        return []
+    def get_king_moves(self, r, c):
+        return []
 
 
 class Move:
@@ -58,6 +112,16 @@ class Move:
         self.end_sq_col = end_sq[1]
         self.moved_piece = board[self.start_sq_row, self.start_sq_col]
         self.captured_piece =board[self.end_sq_row, self.end_sq_col]
+        self.move_id = 1000 * self.start_sq_row + 100 * self.start_sq_col + 10 * self.end_sq_row + self.end_sq_col
+
+    def __eq__(self, other):
+        if not isinstance(other, Move):
+            return False
+        if self.move_id == other.move_id:
+            return True
+        else:
+            return False
+
     def get_chess_notation(self):
         return Move.get_rank_file(self.start_sq_row, self.start_sq_col) + Move.get_rank_file(self.end_sq_row, self.end_sq_col)
 
