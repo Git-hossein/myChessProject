@@ -1,7 +1,7 @@
 """
 This is the main Python file. responsible for handling user input and displaying the current GameState object.
 """
-import numpy as np
+
 from Chess import ChessEngine
 import pygame as p
 import os
@@ -96,7 +96,7 @@ def draw_board(screen):
             p.draw.rect(screen, color, square)
 
 
-def draw_pieces(screen, board: np.ndarray):
+def draw_pieces(screen, board: list[list[int]]):
     """draw the pieces on the board"""
     for i in range(DIMENSION):
         for j in range(DIMENSION):

@@ -3,7 +3,6 @@ This class is responsible for storing all the info about the current state of a 
 responsible for determining the valid moves at the current state. it will also keep a move log
 """
 from __future__ import annotations
-import numpy as np
 from collections.abc import Callable
 from Chess.ChessMain import DIMENSION
 
