@@ -53,9 +53,7 @@ def main():
                     if sq_selected == (row, col): # selecting the same square twice -> reset (deselect)
                         sq_selected = ()
                         player_clicks = []
-                    # elif len(player_clicks) == 0 and gs.board[row, col] == "--": # if the first clicked square is empty, reset
-                    #         sq_selected = ()
-                    #         player_clicks = []
+
                     else:
                         sq_selected = (row, col)
                         player_clicks.append(sq_selected)
@@ -65,8 +63,10 @@ def main():
                             if move in valid_moves:
                                 gs.make_move(move)
                                 move_made = True
-                            sq_selected = ()
-                            player_clicks = []
+                                sq_selected = ()
+                                player_clicks = []
+                            else:
+                                player_clicks = [sq_selected]
 
         if move_made:
             valid_moves = gs.get_valid_moves()
