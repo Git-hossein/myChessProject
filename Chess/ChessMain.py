@@ -100,7 +100,7 @@ def draw_pieces(screen, board: np.ndarray):
     """draw the pieces on the board"""
     for i in range(DIMENSION):
         for j in range(DIMENSION):
-            piece = board[i,j]
+            piece = board[i][j]
             if piece == "--": continue
             screen.blit(IMAGES[piece], (j * SQ_SIZE, i * SQ_SIZE))
 

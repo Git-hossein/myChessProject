@@ -12,7 +12,7 @@ class GameState:
     def __init__(self):
         # the board is an 8x8 2d list. each element is a piece. empty fields are represented via "--" otherwise each
         # piece has two characters, first one determines the color and the second the type.
-        self.board = np.array([
+        self.board = [
             ["bR", "bN", "bB", "bQ", "bK", "bB", "bN", "bR"],
             ["bP","bP", "bP", "bP", "bP", "bP", "bP", "bP"],
             ["--", "--", "--", "--", "--", "--", "--", "--"],
@@ -20,7 +20,7 @@ class GameState:
             ["--", "--", "--", "--", "--", "--", "--", "--"],
             ["--", "--", "--", "--", "--", "--", "--", "--"],
             ["wP", "wP", "wP", "wP", "wP", "wP", "wP", "wP"],
-            ["wR", "wN", "wB", "wQ", "wK", "wB", "wN", "wR"]])
+            ["wR", "wN", "wB", "wQ", "wK", "wB", "wN", "wR"]]
 
         self.white_to_play = True
         self.movelog = []
@@ -29,16 +29,16 @@ class GameState:
             "B": self.get_bishop_moves, "Q": self.get_queen_moves, "K": self.get_king_moves}
 
     def make_move(self, move: Move):
-        self.board[move.start_sq_row, move.start_sq_col] = "--"
-        self.board[move.end_sq_row, move.end_sq_col] = move.moved_piece
+        self.board[move.start_sq_row][move.start_sq_col] = "--"
+        self.board[move.end_sq_row][move.end_sq_col] = move.moved_piece
         self.movelog.append(move)
         self.white_to_play = not self.white_to_play
 
     def undo_last_move(self):
         if len(self.movelog) != 0:
             last_move: Move = self.movelog.pop()
-            self.board[last_move.end_sq_row, last_move.end_sq_col] = last_move.captured_piece
-            self.board[last_move.start_sq_row, last_move.start_sq_col] = last_move.moved_piece
+            self.board[last_move.end_sq_row][last_move.end_sq_col] = last_move.captured_piece
+            self.board[last_move.start_sq_row][last_move.start_sq_col] = last_move.moved_piece
             self.white_to_play = not self.white_to_play
 
     def get_valid_moves(self):
@@ -49,10 +49,10 @@ class GameState:
         turn = "w" if self.white_to_play else "b"
         for r in range(DIMENSION):
             for c in range(DIMENSION):
-                if self.board[r, c][0] != turn:
+                if self.board[r][c][0] != turn:
                     continue
                 else:
-                    piece = self.board[r,c][1]
+                    piece = self.board[r][c][1]
                     possible_moves.extend(self.move_functions[piece](r, c))
 
         return possible_moves
@@ -66,15 +66,15 @@ class GameState:
         starting_row = 6 if self.white_to_play else 1
         opposing_color = "b" if self.white_to_play else "w"
 
-        if self.board[r + forward, c] == "--":                                               #move one square
+        if self.board[r + forward][c] == "--":                                               #move one square
             moves.append(Move((r, c), (r + forward, c), self.board))
-            if r == starting_row and self.board[r + 2 * forward, c] == "--":                 #move two squares
+            if r == starting_row and self.board[r + 2 * forward][c] == "--":                 #move two squares
                 moves.append(Move((r, c), (r + 2 * forward, c), self.board))
 
-        if c-1>=0 and self.board[r + forward, c-1][0] == opposing_color:                     #capture to the left
+        if c-1>=0 and self.board[r + forward][c-1][0] == opposing_color:                     #capture to the left
             moves.append(Move((r,c), (r + forward, c-1), self.board))
 
-        if c+1 <= DIMENSION-1 and self.board[r + forward, c+1][0] == opposing_color:         #capture to the right
+        if c+1 <= DIMENSION-1 and self.board[r + forward][c+1][0] == opposing_color:         #capture to the right
             moves.append(Move((r, c), (r + forward, c + 1), self.board))
 
         return moves
@@ -145,7 +145,7 @@ class GameState:
             for dr, dc in directions:
                 row, col = r + dr, c + dc
                 if (0<= row <DIMENSION and 0<= col <DIMENSION):
-                    piece = self.board[row, col]
+                    piece = self.board[row][col]
                     if piece == "--" or piece[0] == opposing_color: 
                         moves.append(Move((r, c), (row, col), self.board))
             return moves
@@ -206,8 +206,8 @@ class Move:
         self.start_sq_col = start_sq[1]
         self.end_sq_row = end_sq[0]
         self.end_sq_col = end_sq[1]
-        self.moved_piece = board[self.start_sq_row, self.start_sq_col]
-        self.captured_piece =board[self.end_sq_row, self.end_sq_col]
+        self.moved_piece = board[self.start_sq_row][self.start_sq_col]
+        self.captured_piece =board[self.end_sq_row][self.end_sq_col]
         self.move_id = 1000 * self.start_sq_row + 100 * self.start_sq_col + 10 * self.end_sq_row + self.end_sq_col
 
     def __eq__(self, other):
