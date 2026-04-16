@@ -59,7 +59,7 @@ class GameState:
 
     def get_pawn_moves(self, r, c):
         """
-        get all the possible moves for a pawn located at row r and column c as a list {{{Move}}}s.
+        get all the possible moves for a pawn located at row r and column c as a list of `Moves`.
         """
         moves = []
         forward = -1 if self.white_to_play else +1
@@ -80,16 +80,112 @@ class GameState:
         return moves
 
     def get_rook_moves(self, r, c):
-        return []
-    def get_knight_moves(self, r, c):
-        return []
-    def get_bishop_moves(self, r, c):
-        return []
-    def get_queen_moves(self, r, c):
-        return []
-    def get_king_moves(self, r, c):
-        return []
+        """
+        get all the possible moves for a rook located at row r and column c as a list of `Moves`.
+        """
+        directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+        return self.get_sliding_moves(r, c, directions)
 
+
+    def get_knight_moves(self, r, c):
+        """
+        get all the possible moves for a knight located at row r and column c as a list of `Moves`.
+        """
+        directions = [
+            (-1, 2),
+            (1, 2),
+            (-2, 1),
+            (-2, -1),
+            (-1, -2),
+            (1, -2),
+            (2, 1),
+            (2, -1)]
+             
+        return self.get_stepping_moves(r, c, directions)
+        
+    
+    def get_bishop_moves(self, r, c):
+        """
+        get all the possible moves for a bishop located at row r and column c as a list of `Moves`.
+        """
+        directions = [(1,1), (1, -1), (-1,1), (-1, -1)]
+        return self.get_sliding_moves(r,c, directions)
+
+    def get_queen_moves(self, r, c):
+        """
+        get all the possible moves for a queen located at row r and column c as a list of `Moves`.
+        """
+        directions = [(1, 0), (-1, 0), (0, 1), (0, -1), (1,1), (1, -1), (-1,1), (-1, -1)]
+        return self.get_sliding_moves(r, c, directions)
+    
+    def get_king_moves(self, r, c):
+        """
+        get all the possible moves for a king located at row r and column c as a list of `Moves`.
+        """
+        directions = [(1, 0), (-1, 0), (0, 1), (0, -1), (1,1), (1, -1), (-1,1), (-1, -1)]
+        return self.get_stepping_moves(r, c, directions)
+
+    def get_stepping_moves(self, r, c, directions):
+            """
+            Generates all possible moves for a steping piece (King, Knight).
+
+            The piece steps in each directions once, checks it hits an enemy piece or lands on
+            an empty square all the while making sure not step out of the edges.
+
+            Args:
+                r (int): Starting row index.
+                c (int): Starting column index.
+                directions (list[tuple]): List of (dr, dc) vectors (e.g., [(2, -1), ...]).
+
+            Returns:
+                list[Move]: A list of valid Move objects for the piece.
+            """
+            moves = []
+            opposing_color = "b" if self.white_to_play else "w"
+            for dr, dc in directions:
+                row, col = r + dr, c + dc
+                if (0<= row <DIMENSION and 0<= col <DIMENSION):
+                    piece = self.board[row, col]
+                    if piece == "--" or piece[0] == opposing_color: 
+                        moves.append(Move((r, c), (row, col), self.board))
+            return moves
+
+    def get_sliding_moves(self, r, c, directions):
+        """
+            Generates all possible moves for a sliding piece (Rook, Bishop, or Queen).
+
+            The piece continues to move in each direction until it hits the edge of
+            the board, a friendly piece (blocked), or an enemy piece (captured).
+
+            Args:
+                r (int): Starting row index.
+                c (int): Starting column index.
+                directions (list[tuple]): List of (dr, dc) unit vectors (e.g., [(1, 0), ...]).
+
+            Returns:
+                list[Move]: A list of valid Move objects for the piece.
+            """
+        moves = []
+        opposing_color = "b" if self.white_to_play else "w"
+
+        for dr, dc in directions:
+            row, col = r + dr, c + dc
+
+            while 0 <= row < DIMENSION and 0 <= col < DIMENSION:
+                square = self.board[row][col]
+
+                if square == "--":
+                    moves.append(Move((r, c), (row, col), self.board))
+                elif square[0] == opposing_color:
+                    moves.append(Move((r, c), (row, col), self.board))
+                    break
+                else:
+                    break
+
+                row += dr
+                col += dc
+
+        return moves
 
 class Move:
     ranks_to_rows ={
