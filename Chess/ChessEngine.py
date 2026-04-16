@@ -23,6 +23,8 @@ class GameState:
 
         self.white_to_play = True
         self.movelog = []
+        self.white_king_pos = (7,4)
+        self.black_king_pos = (0, 7)
         self.move_functions: dict[str, Callable] = {
             "P": self.get_pawn_moves, "R": self.get_rook_moves, "N": self.get_knight_moves,
             "B": self.get_bishop_moves, "Q": self.get_queen_moves, "K": self.get_king_moves}
@@ -33,12 +35,23 @@ class GameState:
         self.movelog.append(move)
         self.white_to_play = not self.white_to_play
 
+        if move.moved_piece == "bK":
+            self.black_king_pos = (move.end_sq_row, move.end_sq_col)
+        elif move.moved_piece == "wK":
+            self.white_king_pos = (move.end_sq_row, move.end_sq_col)
+
+
     def undo_last_move(self):
         if len(self.movelog) != 0:
             last_move: Move = self.movelog.pop()
             self.board[last_move.end_sq_row][last_move.end_sq_col] = last_move.captured_piece
             self.board[last_move.start_sq_row][last_move.start_sq_col] = last_move.moved_piece
             self.white_to_play = not self.white_to_play
+
+            if last_move.moved_piece == "bK":
+                self.black_king_pos = (last_move.start_sq_row, last_move.start_sq_col)
+            elif last_move.moved_piece == "wK":
+                self.white_king_pos = (last_move.start_sq_row, last_move.start_sq_col)
 
     def get_valid_moves(self):
         return self.get_all_possible_moves()
