@@ -25,6 +25,8 @@ class GameState:
         self.movelog = []
         self.white_king_pos = (7,4)
         self.black_king_pos = (0, 7)
+        self.checkmate = False
+        self.stalemate = False
         self.move_functions: dict[str, Callable] = {
             "P": self.get_pawn_moves, "R": self.get_rook_moves, "N": self.get_knight_moves,
             "B": self.get_bishop_moves, "Q": self.get_queen_moves, "K": self.get_king_moves}
@@ -54,7 +56,98 @@ class GameState:
                 self.white_king_pos = (last_move.start_sq_row, last_move.start_sq_col)
 
     def get_valid_moves(self):
-        return self.get_all_possible_moves()
+        moves = self.get_all_possible_moves()
+        for i in range(len(moves)-1, -1, -1):
+            move = moves[i]
+            self.make_move(move)
+            self.white_to_play = not self.white_to_play
+            if self.in_check_efficient():
+                moves.remove(move)
+            self.undo_last_move()
+            self.white_to_play = not self.white_to_play
+
+        if len(moves) == 0:
+            if self.in_check():
+                self.checkmate = True
+            else:
+                self.stalemate = True
+        else:
+            self.stalemate, self.checkmate = False, False
+
+        return moves
+
+    def in_check(self):
+        king_pos = self.white_king_pos if self.white_to_play else self.black_king_pos
+        return self.square_under_attack(king_pos[0], king_pos[1])
+
+    def in_check_efficient(self):
+        # 1. Determine who we are looking for
+        if self.white_to_play:
+            king_r, king_c = self.white_king_pos
+            friendly_color = "w"
+            enemy_color = "b"
+            # From White King's view, Black pawns attack from "above" (-1)
+            pawn_directions = [(-1, 1), (-1, -1)]
+        else:
+            king_r, king_c = self.black_king_pos
+            friendly_color = "b"
+            enemy_color = "w"
+            # From Black King's view, White pawns attack from "below" (+1)
+            pawn_directions = [(1, 1), (1, -1)]
+
+        # 2. Check for Knight attacks (Fixed boundary and color)
+        knight_directions = [(-1, 2), (1, 2), (-2, 1), (-2, -1), (-1, -2), (1, -2), (2, 1), (2, -1)]
+        for dr, dc in knight_directions:
+            r, c = king_r + dr, king_c + dc
+            if 0 <= r < DIMENSION and 0 <= c < DIMENSION:
+                piece = self.board[r][c]
+                if piece[0] == enemy_color and piece[1] == "N":
+                    return True
+
+        # 3. Check for Sliding pieces, Pawns, and King (Fixed color checks)
+        directions = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)]
+        for dr, dc in directions:
+            for i in range(1, DIMENSION):  # Using range(1,8) instead of while is often cleaner
+                r, c = king_r + dr * i, king_c + dc * i
+                if 0 <= r < 8 and 0 <= c < 8:
+                    piece = self.board[r][c]
+                    if piece == "--":
+                        continue
+                    elif piece[0] == friendly_color:
+                        break  # Blocked by our own piece
+                    else:  # Enemy piece
+                        type = piece[1]
+                        # Orthogonal threats
+                        if (dr == 0 or dc == 0) and type in ("R", "Q"):
+                            return True
+                        # Diagonal threats
+                        elif (dr != 0 and dc != 0) and type in ("B", "Q"):
+                            return True
+                        # Pawn threats (only 1 square away)
+                        elif i == 1 and type == "P" and (dr, dc) in pawn_directions:
+                            return True
+                        # Enemy King (prevents kings from standing next to each other)
+                        elif i == 1 and type == "K":
+                            return True
+
+                        break  # Hit an enemy piece that doesn't check us, it blocks the line
+                else:
+                    break  # Off board
+
+        return False
+
+
+
+
+
+    def square_under_attack(self, r, c):
+        self.white_to_play = not self.white_to_play
+        opponent_moves = self.get_all_possible_moves()
+        self.white_to_play = not self.white_to_play
+        for move in opponent_moves:
+            if r == move.end_sq_row and c == move.end_sq_col:
+                return True
+        return False
 
     def get_all_possible_moves(self):
         possible_moves = []
