@@ -4,8 +4,10 @@ responsible for determining the valid moves at the current state. it will also k
 """
 from __future__ import annotations
 from collections.abc import Callable
-from Chess.ChessMain import DIMENSION
 
+
+class GameConfig:
+    DIMENSION = 8
 
 class GameState:
     def __init__(self):
@@ -99,7 +101,7 @@ class GameState:
         knight_directions = [(-1, 2), (1, 2), (-2, 1), (-2, -1), (-1, -2), (1, -2), (2, 1), (2, -1)]
         for dr, dc in knight_directions:
             r, c = king_r + dr, king_c + dc
-            if 0 <= r < DIMENSION and 0 <= c < DIMENSION:
+            if 0 <= r < GameConfig.DIMENSION and 0 <= c < GameConfig.DIMENSION:
                 piece = self.board[r][c]
                 if piece[0] == enemy_color and piece[1] == "N":
                     return True
@@ -107,7 +109,7 @@ class GameState:
         # 3. Check for Sliding pieces, Pawns, and King (Fixed color checks)
         directions = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)]
         for dr, dc in directions:
-            for i in range(1, DIMENSION):  # Using range(1,8) instead of while is often cleaner
+            for i in range(1, GameConfig.DIMENSION):  # Using range(1,8) instead of while is often cleaner
                 r, c = king_r + dr * i, king_c + dc * i
                 if 0 <= r < 8 and 0 <= c < 8:
                     piece = self.board[r][c]
@@ -152,8 +154,8 @@ class GameState:
     def get_all_possible_moves(self):
         possible_moves = []
         turn = "w" if self.white_to_play else "b"
-        for r in range(DIMENSION):
-            for c in range(DIMENSION):
+        for r in range(GameConfig.DIMENSION):
+            for c in range(GameConfig.DIMENSION):
                 if self.board[r][c][0] != turn:
                     continue
                 else:
@@ -179,7 +181,7 @@ class GameState:
         if c-1>=0 and self.board[r + forward][c-1][0] == opposing_color:                     #capture to the left
             moves.append(Move((r,c), (r + forward, c-1), self.board))
 
-        if c+1 <= DIMENSION-1 and self.board[r + forward][c+1][0] == opposing_color:         #capture to the right
+        if c+1 <= GameConfig.DIMENSION-1 and self.board[r + forward][c+1][0] == opposing_color:         #capture to the right
             moves.append(Move((r, c), (r + forward, c + 1), self.board))
 
         return moves
@@ -249,7 +251,7 @@ class GameState:
             opposing_color = "b" if self.white_to_play else "w"
             for dr, dc in directions:
                 row, col = r + dr, c + dc
-                if (0<= row <DIMENSION and 0<= col <DIMENSION):
+                if (0<= row <GameConfig.DIMENSION and 0<= col <GameConfig.DIMENSION):
                     piece = self.board[row][col]
                     if piece == "--" or piece[0] == opposing_color: 
                         moves.append(Move((r, c), (row, col), self.board))
@@ -276,7 +278,7 @@ class GameState:
         for dr, dc in directions:
             row, col = r + dr, c + dc
 
-            while 0 <= row < DIMENSION and 0 <= col < DIMENSION:
+            while 0 <= row < GameConfig.DIMENSION and 0 <= col < GameConfig.DIMENSION:
                 square = self.board[row][col]
 
                 if square == "--":
