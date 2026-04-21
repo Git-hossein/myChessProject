@@ -44,6 +44,10 @@ class GameState:
         elif move.moved_piece == "wK":
             self.white_king_pos = (move.end_sq_row, move.end_sq_col)
 
+        if move.is_En_Passant:
+            self.board[move.start_sq_row][move.end_sq_col] = "--"
+            print(move)
+
         if move.is_pawn_promotion and is_real_move:
             print("promoting!!!!")
             promotion_event = pg.event.Event(GameConfig.PAWN_PROMOTION_EVENT, {"move": move})
@@ -58,6 +62,10 @@ class GameState:
             self.board[last_move.end_sq_row][last_move.end_sq_col] = last_move.captured_piece
             self.board[last_move.start_sq_row][last_move.start_sq_col] = last_move.moved_piece
             self.white_to_play = not self.white_to_play
+
+            if last_move.is_En_Passant:
+                self.board[last_move.end_sq_row][last_move.end_sq_col] = "--"  # The landing square is actually empty
+                self.board[last_move.start_sq_row][last_move.end_sq_col] = last_move.captured_piece  # Put pawn back side-by-side
 
             if last_move.moved_piece == "bK":
                 self.black_king_pos = (last_move.start_sq_row, last_move.start_sq_col)
@@ -179,17 +187,34 @@ class GameState:
         forward = -1 if self.white_to_play else +1
         starting_row = 6 if self.white_to_play else 1
         opposing_color = "b" if self.white_to_play else "w"
+        opponent_pawn = f"{opposing_color}P"
+        dest_row = r + forward
+        if 0 <= dest_row < GameConfig.DIMENSION:
+            if self.board[dest_row][c] == "--":                                               #move one square
+                moves.append(Move((r, c), (dest_row, c), self.board))
+                if r == starting_row and self.board[r + 2 * forward][c] == "--":                 #move two squares
+                    moves.append(Move((r, c), (r + 2 * forward, c), self.board))
 
-        if self.board[r + forward][c] == "--":                                               #move one square
-            moves.append(Move((r, c), (r + forward, c), self.board))
-            if r == starting_row and self.board[r + 2 * forward][c] == "--":                 #move two squares
-                moves.append(Move((r, c), (r + 2 * forward, c), self.board))
+            if c-1>=0 and self.board[dest_row][c - 1][0] == opposing_color:                     #capture to the left
+                moves.append(Move((r,c), (dest_row, c - 1), self.board))
 
-        if c-1>=0 and self.board[r + forward][c-1][0] == opposing_color:                     #capture to the left
-            moves.append(Move((r,c), (r + forward, c-1), self.board))
+            if c+1 <= GameConfig.DIMENSION-1 and self.board[dest_row][c + 1][0] == opposing_color:         #capture to the right
+                moves.append(Move((r, c), (dest_row, c + 1), self.board))
 
-        if c+1 <= GameConfig.DIMENSION-1 and self.board[r + forward][c+1][0] == opposing_color:         #capture to the right
-            moves.append(Move((r, c), (r + forward, c + 1), self.board))
+            if c-1>=0 and self.board[r][c-1] == opponent_pawn:
+                last_move = self.movelog[-1]
+                start_sq = last_move.start_sq_row, last_move.start_sq_col
+                end_sq = last_move.end_sq_row, last_move.end_sq_col
+                if start_sq == (r + 2*forward, c-1) and end_sq == (r, c-1) and last_move.moved_piece == opponent_pawn:
+                    print("en passant with ")
+                    moves.append(Move((r, c), (dest_row, c-1), self.board, en_passant=True))
+
+            if c+1 <= GameConfig.DIMENSION-1  and self.board[r][c+1] == opponent_pawn:
+                last_move = self.movelog[-1]
+                start_sq = last_move.start_sq_row, last_move.start_sq_col
+                end_sq = last_move.end_sq_row, last_move.end_sq_col
+                if start_sq == (r + 2 * forward, c + 1) and  end_sq == (r, c + 1) and last_move.moved_piece == opponent_pawn:
+                    moves.append(Move((r, c), (dest_row, c + 1), self.board, en_passant=True))
 
         return moves
 
@@ -315,13 +340,15 @@ class Move:
     def get_rank_file(cls, row, col):
         return cls.cols_to_files[col] + cls.rows_to_ranks[row]
 
-    def __init__(self, start_sq, end_sq, board):
+    def __init__(self, start_sq, end_sq, board, en_passant = False):
         self.start_sq_row = start_sq[0]
         self.start_sq_col = start_sq[1]
         self.end_sq_row = end_sq[0]
         self.end_sq_col = end_sq[1]
         self.moved_piece = board[self.start_sq_row][self.start_sq_col]
-        self.captured_piece =board[self.end_sq_row][self.end_sq_col]
+        self.captured_piece =board[self.end_sq_row][self.end_sq_col] if not en_passant else board[self.start_sq_row][self.end_sq_col]
+        assert not en_passant or board[self.start_sq_row][self.end_sq_col][1] == "P", f"{board[self.end_sq_row-1][self.end_sq_col]}"
+        self.is_En_Passant = en_passant
         self.is_pawn_promotion = False
         self.promotion_piece = None
         if (self.moved_piece == "wP" and self.end_sq_row == 0) or (self.moved_piece == "bP" and self.end_sq_row == 7):
@@ -335,6 +362,9 @@ class Move:
             return True
         else:
             return False
+
+    def __str__(self):
+        return f"Move({self.start_sq_row}, {self.start_sq_col} -> {self.end_sq_row}, {self.end_sq_col}, {self.moved_piece} captures {self.captured_piece})"
 
     def get_chess_notation(self):
         return Move.get_rank_file(self.start_sq_row, self.start_sq_col) + Move.get_rank_file(self.end_sq_row, self.end_sq_col)

@@ -87,13 +87,16 @@ def main():
                         player_clicks.append(sq_selected)
                         if len(player_clicks) == 2:
                             move = ChessEngine.Move(player_clicks[0], player_clicks[1], gs.board)
-                            print(move.get_chess_notation())
-                            if move in valid_moves:
-                                gs.make_move(move, is_real_move = True)
-                                move_made = True
-                                sq_selected = ()
-                                player_clicks = []
+                            print(move)
+                            for i in range(len(valid_moves)):
+                                if valid_moves[i] == move:
+                                    gs.make_move(valid_moves[i], is_real_move = True)
+                                    move_made = True
+                                    sq_selected = ()
+                                    player_clicks = []
+                                    break
                             else:
+                                print("invaliedmove")
                                 player_clicks = [sq_selected]
 
         if move_made:
