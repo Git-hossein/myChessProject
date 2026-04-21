@@ -11,7 +11,7 @@ class GameConfig:
 
 class GameState:
     def __init__(self):
-        # the board is an 8x8 2d list. each element is a piece. empty fields are represented via "--" otherwise each
+        # the board is a 8x8 2d list. each element is a piece. empty fields are represented via "--" otherwise each
         # piece has two characters, first one determines the color and the second the type.
         self.board = [
             ["bR", "bN", "bB", "bQ", "bK", "bB", "bN", "bR"],
@@ -234,7 +234,7 @@ class GameState:
 
     def get_stepping_moves(self, r, c, directions):
             """
-            Generates all possible moves for a steping piece (King, Knight).
+            Generates all possible moves for a stepping piece (King, Knight).
 
             The piece steps in each directions once, checks it hits an enemy piece or lands on
             an empty square all the while making sure not step out of the edges.
