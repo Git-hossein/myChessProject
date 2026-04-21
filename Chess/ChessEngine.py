@@ -4,11 +4,12 @@ responsible for determining the valid moves at the current state. it will also k
 """
 from __future__ import annotations
 from collections.abc import Callable
+import pygame as pg
 
 
 class GameConfig:
     DIMENSION = 8
-
+    PAWN_PROMOTION_EVENT = pg.USEREVENT + 1
 class GameState:
     def __init__(self):
         # the board is a 8x8 2d list. each element is a piece. empty fields are represented via "--" otherwise each
@@ -33,16 +34,22 @@ class GameState:
             "P": self.get_pawn_moves, "R": self.get_rook_moves, "N": self.get_knight_moves,
             "B": self.get_bishop_moves, "Q": self.get_queen_moves, "K": self.get_king_moves}
 
-    def make_move(self, move: Move):
+    def make_move(self, move: Move, is_real_move = False):
         self.board[move.start_sq_row][move.start_sq_col] = "--"
         self.board[move.end_sq_row][move.end_sq_col] = move.moved_piece
         self.movelog.append(move)
-        self.white_to_play = not self.white_to_play
 
         if move.moved_piece == "bK":
             self.black_king_pos = (move.end_sq_row, move.end_sq_col)
         elif move.moved_piece == "wK":
             self.white_king_pos = (move.end_sq_row, move.end_sq_col)
+
+        if move.is_pawn_promotion and is_real_move:
+            print("promoting!!!!")
+            promotion_event = pg.event.Event(GameConfig.PAWN_PROMOTION_EVENT, {"move": move})
+            pg.event.post(promotion_event)
+        else:
+            self.white_to_play = not self.white_to_play
 
 
     def undo_last_move(self):
@@ -315,6 +322,10 @@ class Move:
         self.end_sq_col = end_sq[1]
         self.moved_piece = board[self.start_sq_row][self.start_sq_col]
         self.captured_piece =board[self.end_sq_row][self.end_sq_col]
+        self.is_pawn_promotion = False
+        self.promotion_piece = None
+        if (self.moved_piece == "wP" and self.end_sq_row == 0) or (self.moved_piece == "bP" and self.end_sq_row == 7):
+            self.is_pawn_promotion = True
         self.move_id = 1000 * self.start_sq_row + 100 * self.start_sq_col + 10 * self.end_sq_row + self.end_sq_col
 
     def __eq__(self, other):

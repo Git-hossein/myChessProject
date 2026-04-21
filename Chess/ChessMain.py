@@ -3,7 +3,7 @@ This is the main Python file. responsible for handling user input and displaying
 """
 
 from Chess import ChessEngine
-import pygame as p
+import pygame as pg
 import os
 
 WIDTH = HEIGHT = 512
@@ -18,15 +18,15 @@ def load_images():
     pieces = ["wP", "wR", "wN", "wB", "wQ", "wK", "bP", "bR", "bN", "bB", "bQ", "bK"]
     img_dir: str = os.path.join(os.path.dirname(__file__), "chess_figures") # type: ignore
     for piece in pieces:
-        image = p.image.load(os.path.join(img_dir, f"{piece}.png")).convert_alpha()
-        IMAGES[piece] = p.transform.scale(image, (SQ_SIZE, SQ_SIZE))
+        image = pg.image.load(os.path.join(img_dir, f"{piece}.png")).convert_alpha()
+        IMAGES[piece] = pg.transform.scale(image, (SQ_SIZE, SQ_SIZE))
 
 
 
 def main():
-    p.init()
-    screen = p.display.set_mode((WIDTH, HEIGHT))
-    clock = p.time.Clock()
+    pg.init()
+    screen = pg.display.set_mode((WIDTH, HEIGHT))
+    clock = pg.time.Clock()
     screen.fill("white")
     gs = ChessEngine.GameState()
     valid_moves = gs.get_valid_moves()
@@ -35,19 +35,47 @@ def main():
     sq_selected = () # the square selected by the player (row, col)
     player_clicks = [] # keeps tracks of player clicks (first click and second click). two tuples at most
     running = True
+
+    waiting_for_promotion = False
     while running:
-        for e in p.event.get() :
+
+        for e in pg.event.get() :
+
+            if waiting_for_promotion:
+                if e.type == pg.KEYDOWN:
+                    choice = None
+                    turn = "w" if gs.white_to_play else "b"
+                    if e.key == pg.K_q: choice = f"{turn}Q"
+                    if e.key == pg.K_r: choice = f"{turn}R"
+                    if e.key == pg.K_b: choice = f"{turn}B"
+                    if e.key == pg.K_n: choice = f"{turn}N"
+
+                    if choice:
+                        print(f"Promoted to {choice}!")
+                        waiting_for_promotion = False
+                        promotion_move = None
+                        gs.board[pending_promotion_move.end_sq_row][pending_promotion_move.end_sq_col] = choice
+                        move_made = True  # Trigger valid move recalculation
+                        gs.white_to_play = not gs.white_to_play
+
+                continue
+
             match e.type:
 
-                case p.QUIT:
+                case pg.QUIT:
                     running = False
 
-                case p.KEYDOWN if e.key == p.K_LEFT:
+                case e_type if e_type == ChessEngine.GameConfig.PAWN_PROMOTION_EVENT:
+                    print("we're going into lock mode")
+                    waiting_for_promotion = True
+                    pending_promotion_move = e.move
+
+                case pg.KEYDOWN if e.key == pg.K_LEFT:
                     gs.undo_last_move()
                     move_made = True
 
-                case p.MOUSEBUTTONDOWN:
-                    x, y = p.mouse.get_pos()
+                case pg.MOUSEBUTTONDOWN:
+                    x, y = pg.mouse.get_pos()
                     col = x // SQ_SIZE
                     row = y // SQ_SIZE
                     if sq_selected == (row, col): # selecting the same square twice -> reset (deselect)
@@ -61,7 +89,7 @@ def main():
                             move = ChessEngine.Move(player_clicks[0], player_clicks[1], gs.board)
                             print(move.get_chess_notation())
                             if move in valid_moves:
-                                gs.make_move(move)
+                                gs.make_move(move, is_real_move = True)
                                 move_made = True
                                 sq_selected = ()
                                 player_clicks = []
@@ -73,7 +101,7 @@ def main():
             move_made = False
         draw_game_state(screen, gs)
         clock.tick(MAX_FPS)
-        p.display.flip()
+        pg.display.flip()
 
 def draw_game_state(screen, gs):
     """
@@ -92,8 +120,8 @@ def draw_board(screen):
     for r in range(DIMENSION):
         for c in range(DIMENSION):
             color = colors[(r + c) % 2]
-            square = p.Rect(c * SQ_SIZE, r * SQ_SIZE, SQ_SIZE, SQ_SIZE)
-            p.draw.rect(screen, color, square)
+            square = pg.Rect(c * SQ_SIZE, r * SQ_SIZE, SQ_SIZE, SQ_SIZE)
+            pg.draw.rect(screen, color, square)
 
 
 def draw_pieces(screen, board: list[list[int]]):
