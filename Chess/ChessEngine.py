@@ -4,8 +4,37 @@ responsible for determining the valid moves at the current state. it will also k
 """
 from __future__ import annotations
 from collections.abc import Callable
-import pygame as pg
+from typing import Literal
 
+import pygame as pg
+from dataclasses import dataclass
+
+@dataclass
+class CastlingManager:
+    color:Literal["w", "b"]
+    castling_kingside_possible: bool = True
+    castling_queen_possible: bool = True
+    preventing_move_num_kingside: int = -1
+    preventing_move_num_queenside: int = -1
+
+    def manage_castling_rights(self, move:Move, move_num):
+        if move.moved_piece == self.color+"K" and self.castling_kingside_possible:
+            self.castling_queen_possible = False
+            self.castling_kingside_possible = False
+            self.preventing_move_num_kingside = move_num
+            self.preventing_move_num_queenside = move_num
+        elif move.moved_piece == self.color+"R" and self.castling_kingside_possible and move.start_sq_col == GameConfig.DIMENSION-1: #kingside
+            self.castling_kingside_possible = False
+            self.preventing_move_num_kingside = move_num
+        elif move.moved_piece == self.color+"R" and self.castling_queen_possible and move.start_sq_col == 0: #queenside
+            self.castling_queen_possible = False
+            self.preventing_move_num_queenside = move_num
+        elif move.captured_piece == self.color+"R" and self.castling_kingside_possible and move.end_sq_col == GameConfig.DIMENSION-1: #kingside
+            self.castling_kingside_possible = False
+            self.preventing_move_num_kingside = move_num
+        elif move.captured_piece == self.color+"R" and self.castling_queen_possible and move.end_sq_col == 0: #queenside
+            self.castling_queen_possible = False
+            self.preventing_move_num_queenside = move_num
 
 class GameConfig:
     DIMENSION = 8
@@ -30,6 +59,8 @@ class GameState:
         self.black_king_pos = (0, 7)
         self.checkmate = False
         self.stalemate = False
+        self.white_castling_manager = CastlingManager(color="w")
+        self.black_castling_manager = CastlingManager(color="b")
         self.move_functions: dict[str, Callable] = {
             "P": self.get_pawn_moves, "R": self.get_rook_moves, "N": self.get_knight_moves,
             "B": self.get_bishop_moves, "Q": self.get_queen_moves, "K": self.get_king_moves}
@@ -48,6 +79,21 @@ class GameState:
             self.board[move.start_sq_row][move.end_sq_col] = "--"
             print(move)
 
+        if move.castling:
+            castling_manager = self.white_castling_manager if self.white_to_play else self.black_castling_manager
+            print(f"its castling and castling kingside is:{castling_manager.castling_kingside_possible} and queenside:{castling_manager.castling_queen_possible}")
+            er, ec = move.end_sq_row, move.end_sq_col
+            if move.end_sq_col == 6 and castling_manager.castling_kingside_possible:
+                assert self.board[er][7] == "wR" if self.white_to_play else "bR"
+                self.board[er][5] = self.board[er][7] #kingside castling
+                self.board[er][7] = "--"
+            elif move.end_sq_col == 2 and castling_manager.castling_queen_possible:
+                assert self.board[er][0] == "wR" if self.white_to_play else "bR"
+                self.board[er][3] = self.board[er][0] #queenside castling
+                self.board[er][0] = "--"
+
+        self.white_castling_manager.manage_castling_rights(move, len(self.movelog))
+        self.black_castling_manager.manage_castling_rights(move, len(self.movelog))
         if move.is_pawn_promotion and is_real_move:
             print("promoting!!!!")
             promotion_event = pg.event.Event(GameConfig.PAWN_PROMOTION_EVENT, {"move": move})
@@ -66,6 +112,30 @@ class GameState:
             if last_move.is_En_Passant:
                 self.board[last_move.end_sq_row][last_move.end_sq_col] = "--"  # The landing square is actually empty
                 self.board[last_move.start_sq_row][last_move.end_sq_col] = last_move.captured_piece  # Put pawn back side-by-side
+            for manager in [self.white_castling_manager, self.black_castling_manager]:
+                if manager.preventing_move_num_kingside == len(self.movelog) + 1:
+                    manager.castling_kingside_possible = True
+                    manager.preventing_move_num_kingside = -1
+                if manager.preventing_move_num_queenside == len(self.movelog) + 1:
+                    manager.castling_queen_possible = True
+                    manager.preventing_move_num_queenside = -1
+            if last_move.castling:
+
+                startsq = (last_move.start_sq_row, last_move.start_sq_col)
+                endsq = (last_move.end_sq_row, last_move.end_sq_col)
+                match (startsq, endsq):
+                    case ((r1, 4), (r2, 6)) if r1 == r2:
+                        color = "b" if r1 == 0 else "w"
+                        self.board[r1][4] = color+"K"
+                        self.board[r1][7] = color+"R"
+                        self.board[r1][5] = "--"
+
+                    case ((r1, 4), (r2, 2)) if r1 == r2:
+                        color = "b" if r1 == 0 else "w"
+                        self.board[r1][4] = color+"K"
+                        self.board[r1][0] = color+"R"
+                        self.board[r1][3] = "--"
+
 
             if last_move.moved_piece == "bK":
                 self.black_king_pos = (last_move.start_sq_row, last_move.start_sq_col)
@@ -262,7 +332,70 @@ class GameState:
         get all the possible moves for a king located at row r and column c as a list of `Moves`.
         """
         directions = [(1, 0), (-1, 0), (0, 1), (0, -1), (1,1), (1, -1), (-1,1), (-1, -1)]
-        return self.get_stepping_moves(r, c, directions)
+        king_moves = self.get_stepping_moves(r, c, directions)
+        #castling:
+        castling_manager = self.white_castling_manager if self.white_to_play else self.black_castling_manager
+
+        """
+        1. king and rook not moved
+        2. no pieces in between
+        3.1. currently in check
+        3.2. in the way in check
+        3.3. into check at end of castling
+        """
+        king = "wK" if self.white_to_play else "bK"
+        rook = "wR" if self.white_to_play else "bR"
+        def update_kings_pos(row, col):
+            if self.white_to_play:
+                self.white_king_pos = (row, col)
+            else:
+                self.ball_king_pos = (row, col)
+        print(f"{castling_manager.castling_kingside_possible}, {castling_manager.castling_queen_possible}")
+        if (castling_manager.castling_kingside_possible
+                and self.board[r][5] == "--"
+                and self.board[r][6] == "--"
+                and self.board[r][7] == rook
+                and not self.in_check_efficient()):
+            print("get king moves: castling kingside")
+
+            is_safe = True
+            for col in [5, 6]:
+                self.board[r][c] = "--"
+                self.board[r][col] = king
+                update_kings_pos(r, col)
+                if self.in_check_efficient():
+                    is_safe = False
+                self.board[r][c] = king
+                self.board[r][col] = "--"
+                update_kings_pos(r, c)
+                if not is_safe: break
+            if is_safe:
+                king_moves.append(Move((r, c), (r, 6), self.board, castling=True))
+
+
+        if (castling_manager.castling_queen_possible
+                and self.board[r][3] == "--"
+                and self.board[r][2] == "--"
+                and self.board[r][1] == "--"
+                and self.board[r][0] == rook
+                and not self.in_check_efficient()):
+            print("get queen moves: castling queenside")
+
+            is_safe = True
+            for col in [3, 2]:
+                self.board[r][c] = "--"
+                self.board[r][col] = king
+                update_kings_pos(r, col)
+                if self.in_check_efficient():
+                    is_safe = False
+                self.board[r][c] = king
+                self.board[r][col] = "--"
+                update_kings_pos(r, c)
+                if not is_safe: break
+            if is_safe:
+                king_moves.append(Move((r, c), (r, 2), self.board, castling=True))
+
+        return king_moves
 
     def get_stepping_moves(self, r, c, directions):
             """
@@ -340,7 +473,7 @@ class Move:
     def get_rank_file(cls, row, col):
         return cls.cols_to_files[col] + cls.rows_to_ranks[row]
 
-    def __init__(self, start_sq, end_sq, board, en_passant = False):
+    def __init__(self, start_sq, end_sq, board, en_passant = False, castling = False):
         self.start_sq_row = start_sq[0]
         self.start_sq_col = start_sq[1]
         self.end_sq_row = end_sq[0]
@@ -349,6 +482,7 @@ class Move:
         self.captured_piece =board[self.end_sq_row][self.end_sq_col] if not en_passant else board[self.start_sq_row][self.end_sq_col]
         assert not en_passant or board[self.start_sq_row][self.end_sq_col][1] == "P", f"{board[self.end_sq_row-1][self.end_sq_col]}"
         self.is_En_Passant = en_passant
+        self.castling = castling
         self.is_pawn_promotion = False
         self.promotion_piece = None
         if (self.moved_piece == "wP" and self.end_sq_row == 0) or (self.moved_piece == "bP" and self.end_sq_row == 7):
