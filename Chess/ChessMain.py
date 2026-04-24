@@ -47,6 +47,7 @@ def load_sound_effects():
 
 def main():
     pg.init()
+    game_over_font = pg.font.SysFont("Arial", 32, bold=True)
     screen = pg.display.set_mode((WIDTH, HEIGHT))
     clock = pg.time.Clock()
     screen.fill("white")
@@ -145,10 +146,11 @@ def main():
             animate = False
 
         draw_game_state(screen, gs, valid_moves, sq_selected)
+
         if gs.checkmate or gs.stalemate:
             game_over = True
             winner = "b" if gs.white_to_play and gs.checkmate else "stalemate" if gs.stalemate else "w"
-            draw_game_over(screen, (gs.white_king_pos, gs.black_king_pos), winner) # type: ignore
+            draw_game_over(screen, game_over_font, (gs.white_king_pos, gs.black_king_pos), winner) # type: ignore
 
         clock.tick(MAX_FPS)
         pg.display.flip()
@@ -220,31 +222,26 @@ def draw_pieces_except(screen, board, target_row, target_col):
                 screen.blit(IMAGES[piece], (j * SQ_SIZE, i * SQ_SIZE))
 
 
-
-def draw_game_over(screen, king_positions, winner: Literal["w", "b", "stalemate"]):
+def draw_game_over(screen, font, king_positions, winner):
     wk, bk = king_positions
-    wk_r, wk_c = wk
-    bk_r, bk_c = bk
-    text = "White Won!" if winner == "w" else "Black Won!" if winner == "b" else "stalemate!"
-    font = pg.font.SysFont("Arial", 20, True)
-    text_obj = font.render(text, True, "black")
-    screen.blit(text_obj, (WIDTH/2 - text_obj.get_width()/2, HEIGHT/2 - text_obj.get_height()/2))
-    get_square = lambda r, c: pg.Rect(c * SQ_SIZE, r * SQ_SIZE, SQ_SIZE, SQ_SIZE)
-    if winner == "w":
-        winner_c, winner_r = wk_c, wk_r
-        losser_c, losser_r = bk_c, bk_r
-    elif winner == "b":
-        winner_c, winner_r = bk_c, bk_r
-        losser_c, losser_r = wk_c, wk_r
 
-    if not winner == "stalemate":
-        winner_square = get_square(winner_r, winner_c)
-        losser_square = get_square(losser_r, losser_c)
-        pg.draw.rect(screen, "gold", winner_square, 5)
-        pg.draw.rect(screen, "red", losser_square, 5)
+    if winner == "stalemate":
+        text = "Stalemate!"
+        winner_color, loser_color = "chocolate1", "chocolate1"
+        winner_pos, loser_pos = wk, bk
     else:
-        pg.draw.rect(screen, "chocolate1", get_square(wk_r, wk_c), 5)
-        pg.draw.rect(screen, "chocolate1", get_square(bk_r, bk_c), 5)
+        text = "White Won!" if winner == "w" else "Black Won!"
+        winner_color, loser_color = "gold", "red"
+        winner_pos, loser_pos = (wk, bk) if winner == "w" else (bk, wk)
+
+    text_obj = font.render(text, True, "black")
+    text_rect = text_obj.get_rect(center=(WIDTH // 2, HEIGHT // 2))
+
+    for pos, color in [(winner_pos, winner_color), (loser_pos, loser_color)]:
+        r, c = pos
+        pg.draw.rect(screen, color, (c * SQ_SIZE, r * SQ_SIZE, SQ_SIZE, SQ_SIZE), 5)
+
+    screen.blit(text_obj, text_rect)
 
 def draw_game_state(screen, gs, valid_moves, sq_selected):
     """
