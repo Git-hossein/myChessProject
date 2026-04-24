@@ -8,12 +8,14 @@ import pygame as pg
 import os
 import math
 
+
 WIDTH = HEIGHT = 512
 DIMENSION = 8 # 8X8 board
 SQ_SIZE = HEIGHT // DIMENSION
 MAX_FPS = 15
 IMAGES = {}
 SURFACES = {"light": {}, "dark": {}}
+SOUND_EFFECTS = {}
 
 def load_images():
     global IMAGES
@@ -36,6 +38,12 @@ def load_highlight_squares():
     SURFACES["dark"]["select_surface"] = get_tinted_surface("lightskyblue1")
     SURFACES["dark"]["highlight_surface"] = get_tinted_surface("gold")
 
+def load_sound_effects():
+    SOUND_EFFECTS["capture_sfx"]= pg.mixer.Sound("./Chess/sound_effects/capture.mp3")
+    SOUND_EFFECTS["move_piece_sfx"]= pg.mixer.Sound("./Chess/sound_effects/move_piece.mp3")
+    SOUND_EFFECTS["illegal_move_sfx"]= pg.mixer.Sound("./Chess/sound_effects/illegal.mp3")
+    SOUND_EFFECTS["castle_sfx"]= pg.mixer.Sound("./Chess/sound_effects/castle.mp3")
+    SOUND_EFFECTS["promote_sfx"] = pg.mixer.Sound("./Chess/sound_effects/promote.mp3")
 
 def main():
     pg.init()
@@ -47,6 +55,7 @@ def main():
     move_made = False
     load_images()
     load_highlight_squares()
+    load_sound_effects()
     sq_selected = () # the square selected by the player (row, col)
     player_clicks = [] # keeps tracks of player clicks (first click and second click). two tuples at most
     running = True
@@ -88,6 +97,7 @@ def main():
 
                 case pg.KEYDOWN if e.key == pg.K_LEFT:
                     gs.undo_last_move()
+                    SOUND_EFFECTS["move_piece_sfx"].play()
                     move_made = True
                     animate = False
                     game_over = False
@@ -117,14 +127,14 @@ def main():
                                 for i in range(len(valid_moves)):
                                     if valid_moves[i] == move:
                                         gs.make_move(valid_moves[i], is_real_move = True)
+                                        play_sfx(valid_moves[i])
                                         move_made = True
                                         sq_selected = ()
                                         player_clicks = []
                                         animate = True
-                                        break
+                                        break                       # the move is a valid move -> break and don't look through the rest of the possible moves
 
-                                else:
-                                    print("invaliedmove")
+                                else:                               # only happens if the for loop doesn't break -> illegal move
                                     player_clicks = [sq_selected]
 
         if move_made:
@@ -144,6 +154,19 @@ def main():
         pg.display.flip()
 
 
+
+
+
+def play_sfx(move):
+
+    if move.castling:
+        SOUND_EFFECTS["castle_sfx"].play()
+    elif move.is_pawn_promotion:
+        SOUND_EFFECTS["promote_sfx"].play()
+    elif move.captured_piece == "--":
+        SOUND_EFFECTS["move_piece_sfx"].play()
+    else:
+        SOUND_EFFECTS["capture_sfx"].play()
 
 def highlight_squares(screen, gs, valid_moves, sq_selected):
     """highlight squares"""
