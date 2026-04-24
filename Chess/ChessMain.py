@@ -1,17 +1,19 @@
 """
 This is the main Python file. responsible for handling user input and displaying the current GameState object.
 """
+from typing import Literal
 
 from Chess import ChessEngine
 import pygame as pg
 import os
+import math
 
 WIDTH = HEIGHT = 512
 DIMENSION = 8 # 8X8 board
 SQ_SIZE = HEIGHT // DIMENSION
 MAX_FPS = 15
 IMAGES = {}
-
+SURFACES = {"light": {}, "dark": {}}
 
 def load_images():
     global IMAGES
@@ -21,6 +23,18 @@ def load_images():
         image = pg.image.load(os.path.join(img_dir, f"{piece}.png")).convert_alpha()
         IMAGES[piece] = pg.transform.scale(image, (SQ_SIZE, SQ_SIZE))
 
+def load_highlight_squares():
+    def get_tinted_surface(color, alpha=100):
+        s = pg.Surface((SQ_SIZE, SQ_SIZE)).convert()
+        s.set_alpha(alpha)
+        s.fill(color)
+        return s
+
+    global SURFACES
+    SURFACES["light"]["select_surface"] = get_tinted_surface("blue")
+    SURFACES["light"]["highlight_surface"] = get_tinted_surface("yellow")
+    SURFACES["dark"]["select_surface"] = get_tinted_surface("lightskyblue1")
+    SURFACES["dark"]["highlight_surface"] = get_tinted_surface("gold")
 
 
 def main():
@@ -32,10 +46,12 @@ def main():
     valid_moves = gs.get_valid_moves()
     move_made = False
     load_images()
+    load_highlight_squares()
     sq_selected = () # the square selected by the player (row, col)
     player_clicks = [] # keeps tracks of player clicks (first click and second click). two tuples at most
     running = True
-
+    animate = False
+    game_over = False
     waiting_for_promotion = False
     while running:
 
@@ -73,44 +89,146 @@ def main():
                 case pg.KEYDOWN if e.key == pg.K_LEFT:
                     gs.undo_last_move()
                     move_made = True
+                    animate = False
+                    game_over = False
+
+                case pg.KEYDOWN if e.key == pg.K_r:
+                    gs = ChessEngine.GameState()
+                    valid_moves = gs.get_valid_moves()
+                    move_made = False
+                    sq_selected = ()
+                    player_clicks = []
 
                 case pg.MOUSEBUTTONDOWN:
-                    x, y = pg.mouse.get_pos()
-                    col = x // SQ_SIZE
-                    row = y // SQ_SIZE
-                    if sq_selected == (row, col): # selecting the same square twice -> reset (deselect)
-                        sq_selected = ()
-                        player_clicks = []
+                    if not game_over:
+                        x, y = pg.mouse.get_pos()
+                        col = x // SQ_SIZE
+                        row = y // SQ_SIZE
+                        if sq_selected == (row, col): # selecting the same square twice -> reset (deselect)
+                            sq_selected = ()
+                            player_clicks = []
 
-                    else:
-                        sq_selected = (row, col)
-                        player_clicks.append(sq_selected)
-                        if len(player_clicks) == 2:
-                            move = ChessEngine.Move(player_clicks[0], player_clicks[1], gs.board)
-                            print(move)
-                            for i in range(len(valid_moves)):
-                                if valid_moves[i] == move:
-                                    gs.make_move(valid_moves[i], is_real_move = True)
-                                    move_made = True
-                                    sq_selected = ()
-                                    player_clicks = []
-                                    break
-                            else:
-                                print("invaliedmove")
-                                player_clicks = [sq_selected]
+                        else:
+                            sq_selected = (row, col)
+                            player_clicks.append(sq_selected)
+                            if len(player_clicks) == 2:
+                                move = ChessEngine.Move(player_clicks[0], player_clicks[1], gs.board)
+                                print(move)
+                                for i in range(len(valid_moves)):
+                                    if valid_moves[i] == move:
+                                        gs.make_move(valid_moves[i], is_real_move = True)
+                                        move_made = True
+                                        sq_selected = ()
+                                        player_clicks = []
+                                        animate = True
+                                        break
+
+                                else:
+                                    print("invaliedmove")
+                                    player_clicks = [sq_selected]
 
         if move_made:
+            if animate:
+                animate_piece(move, screen, gs.board, clock)
             valid_moves = gs.get_valid_moves()
             move_made = False
-        draw_game_state(screen, gs)
+            animate = False
+
+        draw_game_state(screen, gs, valid_moves, sq_selected)
+        if gs.checkmate or gs.stalemate:
+            game_over = True
+            winner = "b" if gs.white_to_play and gs.checkmate else "stalemate" if gs.stalemate else "w"
+            draw_game_over(screen, (gs.white_king_pos, gs.black_king_pos), winner) # type: ignore
+
         clock.tick(MAX_FPS)
         pg.display.flip()
 
-def draw_game_state(screen, gs):
+
+
+def highlight_squares(screen, gs, valid_moves, sq_selected):
+    """highlight squares"""
+    if sq_selected != ():
+        r, c = sq_selected
+        color = "light" if (r + c) % 2 == 0 else "dark"
+        if gs.board[r][c][0] == ("w" if gs.white_to_play else "b"):
+            screen.blit(SURFACES[color]["select_surface"], (c*SQ_SIZE, r*SQ_SIZE))
+        for move in valid_moves:
+            if move.start_sq_row == r and move.start_sq_col == c:
+                screen.blit(SURFACES[color]["highlight_surface"], (move.end_sq_col * SQ_SIZE, move.end_sq_row  * SQ_SIZE))
+
+
+#
+# def animate_piece(move, screen, board, clock, animation_style = None):
+#     dR = move.end_sq_row - move.start_sq_row
+#     dC = move.end_sq_col - move.start_sq_col
+#     frames_per_square = 10
+#     frame_count = max(abs(dR), abs(dC)) * frames_per_square
+#     for frame in range(frame_count + 1):
+#         r, c = move.start_sq_row + dR * frame/frame_count, move.start_sq_col + dC * frame/frame_count
+#         draw_board(screen)
+#         draw_pieces_except(screen, board, move.end_sq_row, move.end_sq_col) #IMPORTANT: the movement has logically already happened (so the piece is at endsq, endcol)
+#         piece = board[move.end_sq_row][move.end_sq_col]
+#         screen.blit(IMAGES[piece], (c * SQ_SIZE, r * SQ_SIZE))
+#         pg.display.flip()
+#         clock.tick(60)
+
+
+def animate_piece(move, screen, board, clock, frame_count = 10):
+    dR = move.end_sq_row - move.start_sq_row
+    dC = move.end_sq_col - move.start_sq_col
+    frame_count = frame_count
+    for frame in range(frame_count + 1):
+        t = frame / frame_count
+        p = (1 - math.cos(t * math.pi)) / 2
+        r, c = move.start_sq_row + dR * p, move.start_sq_col + dC * p
+        draw_board(screen)
+        draw_pieces_except(screen, board, move.end_sq_row, move.end_sq_col)
+        piece = board[move.end_sq_row][move.end_sq_col]
+        screen.blit(IMAGES[piece], (c * SQ_SIZE, r * SQ_SIZE))
+        pg.display.flip()
+        clock.tick(60)
+
+def draw_pieces_except(screen, board, target_row, target_col):
+    for i in range(DIMENSION):
+        for j in range(DIMENSION):
+            piece = board[i][j]
+            if (i, j) == (target_row, target_col): continue
+            if piece != "--":
+                screen.blit(IMAGES[piece], (j * SQ_SIZE, i * SQ_SIZE))
+
+
+
+def draw_game_over(screen, king_positions, winner: Literal["w", "b", "stalemate"]):
+    wk, bk = king_positions
+    wk_r, wk_c = wk
+    bk_r, bk_c = bk
+    text = "White Won!" if winner == "w" else "Black Won!" if winner == "b" else "stalemate!"
+    font = pg.font.SysFont("Arial", 20, True)
+    text_obj = font.render(text, True, "black")
+    screen.blit(text_obj, (WIDTH/2 - text_obj.get_width()/2, HEIGHT/2 - text_obj.get_height()/2))
+    get_square = lambda r, c: pg.Rect(c * SQ_SIZE, r * SQ_SIZE, SQ_SIZE, SQ_SIZE)
+    if winner == "w":
+        winner_c, winner_r = wk_c, wk_r
+        losser_c, losser_r = bk_c, bk_r
+    elif winner == "b":
+        winner_c, winner_r = bk_c, bk_r
+        losser_c, losser_r = wk_c, wk_r
+
+    if not winner == "stalemate":
+        winner_square = get_square(winner_r, winner_c)
+        losser_square = get_square(losser_r, losser_c)
+        pg.draw.rect(screen, "gold", winner_square, 5)
+        pg.draw.rect(screen, "red", losser_square, 5)
+    else:
+        pg.draw.rect(screen, "chocolate1", get_square(wk_r, wk_c), 5)
+        pg.draw.rect(screen, "chocolate1", get_square(bk_r, bk_c), 5)
+
+def draw_game_state(screen, gs, valid_moves, sq_selected):
     """
     responsible for all graphics within a current GameState.
     """
     draw_board(screen)
+    highlight_squares(screen, gs, valid_moves, sq_selected)
     draw_pieces(screen, gs.board)
 
 
